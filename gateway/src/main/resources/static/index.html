@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Demo</title>
+    <style type="text/css">
+        div {
+            margin-bottom: 10px;
+        }
+    </style>
+    <script src="js/sockjs.js"></script>
+    <script src="js/stomp.js"></script>
+    <script type="text/javascript">
+        var stomp = null;
+        var globalSubscription = null;
+        var stompWindow = null;
+        var socketSessionId = null;
+
+        var domIdByMessageOrigin = {
+            "RELAY": "stomp-relay",
+            "RABBIT": "rabbit",
+            "INTEGRATION": "stomp-integration"
+        };
+
+        var domClassByRoutingKey = {
+            "global": "global",
+            "echo.user": "echo-user",
+            "echo.window": "echo-window"
+        };
+
+        function connect() {
+            var socket = new SockJS('/sockjs');
+
+            stomp = Stomp.over(socket);
+
+            // remove noise from heartbeats for debug purposes
+            stomp.heartbeat = {
+                outgoing: 0,
+                incoming: 0
+            };
+
+            stomp.connect({}, function (frame) {
+                console.log('STOMP connection established: ' + frame);
+                setConnected(true);
+
+                // A message sent to an amq.topic exchange with the routing key "global" will be seen by all users
+                globalSubscribe();
+
+                // A message sent to an amq.direct exchange with the routing key "echo.user-user<username>" will be seen
+                // by all logged in sessions with the Principal.getName == <username>
+                // Opt to a custom exchange instead of amq.direct in case a federated exchange is required but it is not
+                // desirable to federate the default amq.direct
+                stomp.subscribe('/user/exchange/amq.direct/echo.user', function (message) {
+                    processMessage("echo.user", message.body);
+                });
+            }, stopDisconnectErrorCallback);
+
+            socketSessionId = generateSessionId();
+            var socketWindow = new SockJS('/sockjs', [], {
+                sessionId: function () {return socketSessionId;}
+            });
+
+            // a separate stomp connection with "useSocketSession" header set on connect,
+            // see me.ssn.wsamq.gateway.config.WebSocketConfiguration.configureClientInboundChannel
+            stompWindow = Stomp.over(socketWindow);
+
+            // remove noise from heartbeats for debug purposes
+            stompWindow.heartbeat = {
+                outgoing: 0,
+                incoming: 0
+            };
+
+            stompWindow.connect({useSocketSession: "true"}, function (frame) {
+                console.log('STOMP connection established, window session: ' + frame);
+
+                // A message sent to an amq.direct exchange with the routing key "echo.window-user<websocket-session>"
+                // will be seen in the current browser window only
+                stompWindow.subscribe('/user/exchange/amq.direct/echo.window', function (message) {
+                    processMessage("echo.window", message.body);
+                });
+            }, stopDisconnectErrorCallback);
+        }
+
+        function globalSubscribe() {
+            if (stomp) {
+                // check if connected...
+                globalSubscription = stomp.subscribe('/topic/global', function (message) {
+                    processMessage("global", message.body);
+                });
+                setSubscribedToGlobal(true);
+            }
+        }
+
+        function globalUnsubscribe() {
+            if (globalSubscription) {
+                globalSubscription.unsubscribe();
+                setSubscribedToGlobal(false);
+            }
+        }
+
+        function stopDisconnectErrorCallback(msg) {
+            if (msg && Object.prototype.toString.call(msg) === "[object String]" &&
+                msg.lastIndexOf("Whoops! Lost connection to", 0) === 0) {
+                setConnected(false);
+            }
+        }
+
+        function setConnected(connected) {
+            document.getElementById('connect').disabled = connected;
+            document.getElementById('disconnect').disabled = !connected;
+            clearMessages(document.getElementById('stomp-relay'));
+            clearMessages(document.getElementById('rabbit'));
+            clearMessages(document.getElementById('stomp-integration'));
+        }
+
+        function setSubscribedToGlobal(subscribed) {
+            document.getElementById('global-subscribe').disabled = subscribed;
+            document.getElementById('global-unsubscribe').disabled = !subscribed;
+        }
+
+        function clearMessages(wrapper) {
+            document.getElementsByClassName('global').innerHTML = '';
+            document.getElementsByClassName('echo-user').innerHTML = '';
+            document.getElementsByClassName('echo-window').innerHTML = '';
+        }
+
+        function disconnect() {
+            if (stomp != null) {
+                stomp.disconnect();
+            }
+            if (stompWindow != null) {
+                stompWindow.disconnect();
+            }
+            setConnected(false);
+        }
+
+        function sendMessage() {
+            var message = document.getElementById('message').value;
+            stomp.send("/app/message", {"X-Socket-Session-Id": socketSessionId}, message);
+        }
+
+        /**
+         * @param routingKey    see domClassByRoutingKey
+         * @param message       ServerMessageDto
+         */
+        function processMessage(routingKey, message) {
+            var messageDto = JSON.parse(message);
+            var wrapperDomId = domIdByMessageOrigin[messageDto.origin];
+            var messageDisplayDomClass = domClassByRoutingKey[routingKey];
+            var text = "[" + messageDto.timestamp + "] " + messageDto.text;
+            appendMessage(wrapperDomId, messageDisplayDomClass, text);
+        }
+
+        function appendMessage(wrapperDomId, messageDisplayDomClass, message) {
+            var messageDisplay = document.getElementById(wrapperDomId).getElementsByClassName(messageDisplayDomClass)[0];
+            messageDisplay.innerHTML = '';
+            messageDisplay.appendChild(document.createTextNode(message));
+        }
+
+        function generateSessionId() {
+            var length = 8;
+            var _randomStringChars = "abcdefghijklmnopqrstuvwxyz012345";
+            var max = _randomStringChars.length;
+            var bytes = new Uint8Array(length);
+            window.crypto.getRandomValues(bytes);
+            var ret = [];
+            for (var i = 0; i < length; i++) {
+                ret.push(_randomStringChars.substr(bytes[i] % max, 1));
+            }
+            return ret.join("");
+        }
+
+    </script>
+</head>
+<body onload="connect()">
+<div>
+    <div>
+        <a href="logout">logout</a>
+    </div>
+    <div>
+        <button id="connect" onclick="connect();">Connect</button>
+        <button id="disconnect" disabled="disabled" onclick="disconnect();">Disconnect</button>
+    </div>
+    <div>
+        <button id="global-subscribe" onclick="globalSubscribe();">Subscribe to global topic</button>
+        <button id="global-unsubscribe" disabled="disabled" onclick="globalUnsubscribe();">Unsubscribe from global topic</button>
+    </div>
+    <div>
+        <label for="message">Message</label>
+        <input type="text" id="message"/>
+        <button onclick="sendMessage();">Send</button>
+    </div>
+    <div><b>Stomp relay - messages sent via SimpMessaginTemplate:</b></div>
+    <div id="stomp-relay">
+        <div>Global: <span class="global"></span></div>
+        <div>User: <span class="echo-user"></span></div>
+        <div>Window: <span class="echo-window"></span></div>
+    </div>
+    <div><b>RabbitMQ - messages sent via RabbitTemplate:</b></div>
+    <div id="rabbit">
+        <div>Global: <span class="global"></span></div>
+        <div>User: <span class="echo-user"></span></div>
+        <div>Window: <span class="echo-window"></span></div>
+    </div>
+    <div><b>Stomp intergration - messages sent via StompSession:</b></div>
+    <div id="stomp-integration">
+        <div>Global: <span class="global"></span></div>
+        <div>User: <span class="echo-user"></span></div>
+        <div>Window: <span class="echo-window"></span></div>
+    </div>
+</div>
+</body>
+</html>
