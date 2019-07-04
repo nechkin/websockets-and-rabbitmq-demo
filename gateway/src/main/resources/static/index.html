@@ -52,7 +52,11 @@
                 stomp.subscribe('/user/exchange/amq.direct/echo.user', function (message) {
                     processMessage("echo.user", message.body);
                 });
-            }, stopDisconnectErrorCallback);
+
+                stomp.subscribe('/user/exchange/amq.direct/echo.user.StompRelay', function (message) {
+                    processMessage("echo.user", message.body);
+                });
+            }, stompDisconnectErrorCallback);
 
             socketSessionId = generateSessionId();
             var socketWindow = new SockJS('/sockjs', [], {
@@ -77,7 +81,7 @@
                 stompWindow.subscribe('/user/exchange/amq.direct/echo.window', function (message) {
                     processMessage("echo.window", message.body);
                 });
-            }, stopDisconnectErrorCallback);
+            }, stompDisconnectErrorCallback);
         }
 
         function globalSubscribe() {
@@ -97,7 +101,7 @@
             }
         }
 
-        function stopDisconnectErrorCallback(msg) {
+        function stompDisconnectErrorCallback(msg) {
             if (msg && Object.prototype.toString.call(msg) === "[object String]" &&
                 msg.lastIndexOf("Whoops! Lost connection to", 0) === 0) {
                 setConnected(false);

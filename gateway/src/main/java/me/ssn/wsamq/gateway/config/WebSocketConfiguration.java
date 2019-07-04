@@ -2,6 +2,7 @@ package me.ssn.wsamq.gateway.config;
 
 import lombok.AllArgsConstructor;
 import me.ssn.wsamq.common.StompBrokerProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -9,6 +10,7 @@ import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -83,6 +85,16 @@ public class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer 
                             accessor.setUser(customUser);
                         }
                     }
+                } else if (accessor != null && StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+                    // Configure some RabbitMQ Stomp specific stuff
+                    // delete when the last downstream consumers for a queue goes away
+                    accessor.setNativeHeader("auto-delete", "true");
+                    // delete when declaring connection closes
+                    accessor.setNativeHeader("exclusive", "true");
+                    // How long a message published to a queue can live before it is discarded (milliseconds).
+                    accessor.setNativeHeader("x-message-ttl", "3000");
+                    // How long a queue can be unused for before it is automatically deleted (milliseconds).
+                    accessor.setNativeHeader("x-expires", String.valueOf(20 * 60 * 1000));
                 }
 
                 return message;
@@ -96,9 +108,9 @@ public class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer 
     // }
 
     // uncomment for echo.user routes to work with RabbitTemplate and StompSession senders
-    // though simpMessagingTemplate won't send to "username" destinations
-    // @Bean
-    // public UsernameUserDestinationResolver userDestinationResolver(SimpUserRegistry simpUserRegistry) {
-    //     return new UsernameUserDestinationResolver(simpUserRegistry);
-    // }
+    // though simpMessagingTemplate won't send to "username" destinations for /exchange/amq.direct/echo.user destination
+    @Bean
+    public UsernameUserDestinationResolver userDestinationResolver(SimpUserRegistry simpUserRegistry) {
+        return new UsernameUserDestinationResolver(simpUserRegistry);
+    }
 }

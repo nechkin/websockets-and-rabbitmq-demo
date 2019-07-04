@@ -14,6 +14,6 @@ public class GlobalMessageProducer {
 
     @Scheduled(fixedRate = 1000)
     public void emitGlobalNotification() {
-        messageHandler.handleGloabl("Global");
+        messageHandler.handleGlobal("Global");
     }
 }

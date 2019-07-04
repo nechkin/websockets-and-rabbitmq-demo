@@ -27,7 +27,7 @@ public class RabbitEchoMessageHandler implements EchoMessageHandler {
     }
 
     @Override
-    public void handleGloabl(String message) {
+    public void handleGlobal(String message) {
         ServerMessageDto messageDto = new ServerMessageDto(MessageOrigin.RABBIT, System.currentTimeMillis(), message);
         rabbitTemplate.convertAndSend("amq.topic", "global", messageDto);
     }

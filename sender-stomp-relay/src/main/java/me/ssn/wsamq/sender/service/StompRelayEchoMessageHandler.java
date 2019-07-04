@@ -27,7 +27,7 @@ public class StompRelayEchoMessageHandler implements EchoMessageHandler, Applica
     public void handle(String username, String socketSessionId, String message) {
         if (brokerAvailable) {
             final ServerMessageDto echo = new ServerMessageDto(MessageOrigin.RELAY, System.currentTimeMillis(), message);
-            simpMessagingTemplate.convertAndSendToUser(username, "/exchange/amq.direct/echo.user", echo);
+            simpMessagingTemplate.convertAndSendToUser(username, "/exchange/amq.direct/echo.user.StompRelay", echo);
             simpMessagingTemplate.convertAndSendToUser(socketSessionId, "/exchange/amq.direct/echo.window", echo);
         } else {
             log.warn("Broker is not yet available");
@@ -35,7 +35,7 @@ public class StompRelayEchoMessageHandler implements EchoMessageHandler, Applica
     }
 
     @Override
-    public void handleGloabl(String message) {
+    public void handleGlobal(String message) {
         if (brokerAvailable) {
             ServerMessageDto messageDto = new ServerMessageDto(MessageOrigin.RELAY, System.currentTimeMillis(), message);
             simpMessagingTemplate.convertAndSend("/topic/global", messageDto);

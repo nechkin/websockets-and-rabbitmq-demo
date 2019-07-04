@@ -57,11 +57,10 @@ public class StompIntegrationEchoMessageHandler implements EchoMessageHandler {
     }
 
     @Override
-    public void handleGloabl(String message) {
+    public void handleGlobal(String message) {
         if (stompSession != null && stompSession.isConnected()) {
             ServerMessageDto messageDto = new ServerMessageDto(MessageOrigin.INTEGRATION, System.currentTimeMillis(),
                     message);
-            StompHeaders headers = new StompHeaders();
             stompSession.send("/topic/global", messageDto);
         } else {
             log.warn("Session is not yet ready");
