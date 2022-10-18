@@ -10,7 +10,7 @@
         <reactor.net.version>2.0.8.RELEASE</reactor.net.version>
         <netty.all.version>4.1.42.Final</netty.all.version>
         <reactor.netty.version>0.8.12.RELEASE</reactor.netty.version>
-        <com.fasterxml.jackson.version>2.10.0.pr3</com.fasterxml.jackson.version>
+        <com.fasterxml.jackson.version>2.13.4.1</com.fasterxml.jackson.version>
 
         <!-- not relevant for this demo -->
         <spring.web.flux.starter.version>2.1.1.RELEASE</spring.web.flux.starter.version>
